@@ -1,0 +1,77 @@
+---  
+You:  
+mevcut kod mimarisi ve geliştirmeleri özetle
+Agent:  
+Call: task(prompt=Analyze the TVLauncher project and provide a comprehensive summary of its current code architecture, features, and recent development history based on the files present in the `app/src/main/java/com/example/tvlauncher/` directory. Focus on the Clean Architecture implementation, Jetpack Compose for TV usage, Matryoshka focus hierarchy, and the IPTV functionality. Return a structured markdown summary.)
+Response:
+  Here is a comprehensive summary of the **TVLauncher** project architecture, features, and technical design based on the source code structure.
+  
+  ### 1. Project Overview
+  **TVLauncher** is a dual-purpose Android TV application that combines a **Custom Home Screen Launcher** with a built-in **Xtream Codes IPTV Player**. It is built entirely using modern Android development practices, specifically leveraging Jetpack Compose for TV and Clean Architecture principles, managed via Dagger Hilt for Dependency Injection.
+  
+  ### 2. Clean Architecture & MVVM Implementation
+  The project strictly adheres to Clean Architecture, isolating business logic from the UI and framework layers:
+  *   **Presentation Layer (`ui/` and `iptv/ui/`)**: Built entirely with Jetpack Compose. Screens are driven by `ViewModel`s (`LauncherViewModel`, `IptvViewModel`) that expose `StateFlow` objects (like `IptvUiState` and `LauncherStatus`).
+  *   **Domain Layer (`domain/`)**: Contains pure business rules decoupled from Android frameworks.
+      *   **Use Cases**: Small, single-responsibility interactors such as `FetchIptvContentUseCase`, `GetInstalledAppsUseCase`, `SetSlotUseCase`, and `SetButtonMappingUseCase`.
+      *   **Repository Interfaces**: Abstractions like `IXtreamRepository`, `ISlotRepository`, and `IButtonMappingRepository` ensure the domain layer doesn't depend on implementation details.
+  *   **Data Layer (`data/` and `iptv/data/`)**: 
+      *   Implements the repository interfaces (e.g., `XtreamRepository`, `SlotRepository`).
+      *   Handles local persistence (using DataStore) and fetching network content (parsing Xtream Codes JSON APIs).
+  *   **Dependency Injection (`di/`)**: Uses Dagger Hilt (`AppModule`, `RepositoryModule`) to provide `Singleton` instances of repositories and inject use cases directly into the ViewModels.
+  
+  ### 3. Jetpack Compose for TV Usage
+  The UI relies heavily on the `androidx.tv.material3` framework to provide an ergonomic 10-foot viewing experience:
+  *   **`HomeScreen.kt`**: Designed with overscan safety (48dp horizontal, 27dp vertical padding). Features an `XtreamHomeCard` that directly opens the IPTV player and a horizontal layout of four App slots.
+  *   **TV Navigation**: Makes use of TV-specific composables (`Surface`, `Border`, `ClickableSurfaceDefaults`) to handle scaling animations (`focusedScale = 1.01f`) and focus borders.
+  *   **Theming**: Custom theming mapped to Android TV specifics (`LauncherColors`, `LauncherTheme`). The slot cards use color-coded borders (Yellow, Red, Green, Blue) corresponding to standard TV remote control colored buttons.
+  
+  ### 4. Matryoshka Focus Hierarchy (Nested Focus)
+  Managing D-pad focus in deep UI hierarchies on Android TV is complex. TVLauncher solves this using a custom "Matryoshka" (Russian Doll) focus strategy.
+  *   **`FocusUtils.kt`**: Provides the `Modifier.nestedMatryoshkaFocus(parentRequester, exitDirection)`. This modifier dictates how focus "escapes" a nested group. If a user presses `D-Pad Left` or the `Back` key, the focus is explicitly returned to the parent container's `FocusRequester` instead of escaping to the Android system or getting lost.
+  *   **`tvFocusBorder`**: A centralized modifier that applies a standardized "Xtream Orange" (`0xFFFF9800`) highlight ring around active elements. 
+  *   **`MatryoshkaVodArea.kt`**: This paradigm is specifically used to handle nested lazy lists (e.g., expanding a TV Series -> Season -> Episode list). It cleanly scopes focus without letting the system focus jump unpredictably across the screen.
+  
+  ### 5. IPTV Functionality (Xtream Codes)
+  A full-featured IPTV player is woven tightly into the launcher ecosystem.
+  *   **Xtream Integration**: The `XtreamRepository` handles URL construction, JSON fetching, caching, and parsing for Live TV, VOD (Video on Demand), and TV Series.
+  *   **Playback UI**: Managed by `IptvPlayerScreen` and `VideoPlayerView`. The architecture supports swapping between full-screen playback and browsing.
+  *   **State Management**: `IptvViewModel` handles the complexities of pagination, category filtering, favorites (`ToggleFavoriteUseCase`), and maintaining the navigation breadcrumbs inside the player itself (pushing/popping navigation nodes).
+  
+  ### 6. Launcher Specific Features
+  Beyond IPTV, the app serves as a robust Android TV Launcher:
+  *   **App Slots**: Users can pin default applications to 4 primary slots (`SlotRepository`).
+  *   **Button Remapping**: Through `LauncherAccessibilityService`, the app can intercept remote control hardware buttons (like the colored media keys) and remap them to instantly launch slotted apps (`ButtonMappingRepository`).
+  *   **Default Launcher Management**: Tracks whether the app is set as the system default launcher or if its accessibility service is running, prompting the user with standard TV UI surfaces if action is required.
+Agent:  
+Bu harika! Gönderdiğin komutla projenin genel yapısını taradım ve **TVLauncher** projenizin mevcut mimarisini ve geliştirme yönünü analiz ettim.
+
+İşte projenizin mevcut mimarisi ve sahip olduğu yeteneklerin genel özeti:
+
+### 1. Genel Mimari Yapı (Clean Architecture & MVVM)
+Projeniz katı bir **Clean Architecture** prensibiyle inşa edilmiş. Uygulamanız 3 ana katmana ayrılmış durumda ve bu katmanlar arası iletişim Dagger Hilt (Dependency Injection) ile sağlanıyor.
+*   **Presentation Layer (UI/ViewModel):** Tüm arayüz **Jetpack Compose for TV** kullanılarak geliştirilmiş. `LauncherViewModel` ve `IptvViewModel` gibi sınıflar üzerinden `StateFlow` nesneleri kullanılarak arayüz tetikleniyor. Hiçbir UI componenti doğrudan veri kaynağına erişmiyor.
+*   **Domain Layer (UseCases):** `FetchIptvContentUseCase`, `SetSlotUseCase` gibi tekil sorumluluk prensibine (Single Responsibility) uyan ve framework'ten bağımsız çalışan UseCase'ler içeriyor.
+*   **Data Layer (Repository):** `XtreamRepository`, `SlotRepository` gibi implementasyonlar ile DataStore (lokal kayıt) ve Xtream Codes API (uzak sunucu JSON) işlemleri yönetiliyor.
+
+### 2. Matruşka Odak Hiyerarşisi (Matryoshka Focus)
+Android TV cihazlarında en büyük sorun olan **D-Pad Odak Kaybolması** (Focus Trapping) problemine çok yaratıcı ve sağlam bir çözüm bulunmuş:
+*   **`FocusUtils.kt` ve `nestedMatryoshkaFocus`:** İç içe geçmiş listelerde (örneğin Kategoriler -> Diziler -> Bölümler), kullanıcı `Geri` tuşuna veya `Sol` yön tuşuna bastığında odaktaki nesne rastgele bir yere zıplamıyor. Bunun yerine hiyerarşik olarak bir üst katmanın `FocusRequester` nesnesine güvenli bir şekilde aktarılıyor.
+*   Odaklanan her öğe için standart olarak `#FFFF9800` (Turuncu) çerçeve ve yumuşak büyüme (`focusedScale`) efektleri kullanılıyor.
+
+### 3. IPTV (Xtream Codes) Oynatıcı Entegrasyonu
+Sadece bir başlatıcı değil, aynı zamanda çok güçlü bir IPTV uygulaması barındırıyor:
+*   Canlı TV (Live), Seç-İzle (VOD) ve Diziler (Series) için ayrı ayrı sekme ve içerik yönetimi.
+*   Sayfalama (Pagination), Favorilere Ekleme ve Kategori Filtreleme gibi karmaşık özellikler `IptvUiState` içinde başarılı bir şekilde izole edilmiş.
+*   `VideoPlayerView` ile ExoPlayer entegrasyonu sağlanmış, hata yönetimi ve adaptif çözünürlük değişimleri takip ediliyor.
+
+### 4. TV Launcher Özellikleri
+Ana ekran bir Android TV Başlatıcısı olarak işlev görüyor:
+*   Kullanıcıların en çok kullandıkları uygulamaları atayabileceği **4 Özel Slot** (Sarı, Kırmızı, Yeşil, Mavi).
+*   **LauncherAccessibilityService:** Kumanda üzerindeki renkli fiziksel tuşları dinleyerek (Button Mapping) atanmış uygulamaları tek tuşla başlatma yeteneği.
+*   Televizyonun "Overscan" (kenar kesme) sorunlarına karşı standart boşluklar (`Padding`) ile güvenli bölgelere yerleştirilmiş UI.
+
+### 💡 Mevcut Durum Üzerine Geliştirme (Seamless Zapping)
+Mimariniz harika bir temele oturtulmuş. Tam olarak bu sağlam yapı (özellikle Matruşka Odak ve ViewModel akışı) sayesinde az önce planladığımız **"Sıfır Gecikmeli Kanal Geçişi (Seamless Zapping)"** özelliğini sadece küçük cerrahi müdahaleler (Deltalar) yaparak, mevcut hiyerarşiyi hiç bozmadan entegre edebileceğiz.
+
+Bu geliştirmeyi uygulamak veya kodda değişiklik yapmak isterseniz hemen işleme başlayabilirim. Hazırım!
